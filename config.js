@@ -8,14 +8,14 @@ module.exports = {
   // Configuração dos projetos
   projects: [
     {
-      id: 'projeto1',
-      name: 'Projeto 1',
-      path: '/caminho/para/projeto1',
+      id: 'webhook',
+      name: 'Webhook',
+      path: '/root/projetos/webhook',
       branch: 'main',
       commands: [
         'git pull origin main',
         'npm install',
-        'pm2 restart projeto1'
+        'pm2 restart webhook-server'
       ]
     }
   ]
