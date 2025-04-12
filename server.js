@@ -76,6 +76,7 @@ function verifyGitLabSignature(req, res, next) {
   next();
 }
 
+
 // Middleware para capturar o corpo bruto para GitHub
 function rawBodyParser(req, res, next) {
   req.rawBody = '';
@@ -87,10 +88,24 @@ function rawBodyParser(req, res, next) {
 
   req.on('end', () => {
     try {
-      req.body = JSON.parse(req.rawBody);
+      // Verificar se o corpo começa com "payload="
+      if (req.rawBody.startsWith('payload=')) {
+        // Decodificar o payload codificado em URL
+        const payloadEncoded = req.rawBody.substring(8); // Remove "payload="
+        const payloadDecoded = decodeURIComponent(payloadEncoded);
+        req.body = JSON.parse(payloadDecoded);
+        
+        // Para verificação de assinatura, precisamos usar o corpo original
+        req.originalRawBody = req.rawBody;
+      } else {
+        // Tentar analisar como JSON normal
+        req.body = JSON.parse(req.rawBody);
+        req.originalRawBody = req.rawBody;
+      }
       next();
     } catch (err) {
       console.error('Erro ao analisar JSON:', err);
+      console.error('Corpo recebido:', req.rawBody);
       res.status(400).send('Payload inválido');
     }
   });
@@ -98,22 +113,47 @@ function rawBodyParser(req, res, next) {
 
 // Middleware para verificar a assinatura do GitHub
 function verifyGitHubSignature(req, res, next) {
-  const signature = req.headers['x-hub-signature-256'];
+  // Verificar qual tipo de assinatura o GitHub está enviando
+  const signature256 = req.headers['x-hub-signature-256'];
+  const signature = req.headers['x-hub-signature'];
   
-  if (!signature) {
-    console.error('Cabeçalho x-hub-signature-256 ausente');
+  // Logar os cabeçalhos para depuração
+  console.log('Headers do GitHub:', JSON.stringify(req.headers, null, 2));
+  
+  // Se não houver assinatura, rejeitar
+  if (!signature256 && !signature) {
+    console.error('Cabeçalhos de assinatura ausentes');
     return res.status(401).json({ error: 'Assinatura inválida' });
   }
   
-  const hmac = crypto.createHmac('sha256', config.secretKey);
-  const digest = 'sha256=' + hmac.update(req.rawBody).digest('hex');
+  // Usar o corpo original para verificação
+  const rawBody = req.originalRawBody || req.rawBody;
   
-  console.log(`Assinatura recebida: ${signature}`);
-  console.log(`Assinatura calculada: ${digest}`);
-  
-  if (signature !== digest) {
-    console.error('Assinatura do GitHub inválida');
-    return res.status(401).json({ error: 'Assinatura inválida' });
+  // Verificar assinatura SHA-256 (preferencial)
+  if (signature256) {
+    const hmac = crypto.createHmac('sha256', config.secretKey);
+    const digest = 'sha256=' + hmac.update(rawBody).digest('hex');
+    
+    console.log(`Assinatura SHA-256 recebida: ${signature256}`);
+    console.log(`Assinatura SHA-256 calculada: ${digest}`);
+    
+    if (signature256 !== digest) {
+      console.error('Assinatura SHA-256 do GitHub inválida');
+      return res.status(401).json({ error: 'Assinatura inválida' });
+    }
+  }
+  // Verificar assinatura SHA-1 (legado)
+  else if (signature) {
+    const hmac = crypto.createHmac('sha1', config.secretKey);
+    const digest = 'sha1=' + hmac.update(rawBody).digest('hex');
+    
+    console.log(`Assinatura SHA-1 recebida: ${signature}`);
+    console.log(`Assinatura SHA-1 calculada: ${digest}`);
+    
+    if (signature !== digest) {
+      console.error('Assinatura SHA-1 do GitHub inválida');
+      return res.status(401).json({ error: 'Assinatura inválida' });
+    }
   }
   
   next();
@@ -159,6 +199,7 @@ app.post('/webhook/:projectId', express.json(), verifyGitLabSignature, async (re
 });
 
 // Rota para webhooks do GitHub
+// Rota para webhooks do GitHub
 app.post('/github/:projectId', rawBodyParser, verifyGitHubSignature, async (req, res) => {
   try {
     const projectId = req.params.projectId;
@@ -171,6 +212,8 @@ app.post('/github/:projectId', rawBodyParser, verifyGitHubSignature, async (req,
     
     // Verificar se o evento é um push
     const event = req.headers['x-github-event'];
+    console.log(`Evento recebido: ${event}`);
+    
     if (event !== 'push') {
       console.log(`Ignorando evento ${event}, esperando push`);
       return res.json({ message: `Evento ${event} ignorado` });
@@ -178,6 +221,8 @@ app.post('/github/:projectId', rawBodyParser, verifyGitHubSignature, async (req,
     
     // Verificar se o push é para a branch correta
     const ref = req.body.ref;
+    console.log(`Referência recebida: ${ref}`);
+    
     const branch = ref ? ref.replace('refs/heads/', '') : '';
     
     if (branch !== project.branch) {
