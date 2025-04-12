@@ -17,18 +17,6 @@ module.exports = {
         'npm install',
         'pm2 restart projeto1'
       ]
-    },
-  /*   // Você pode adicionar mais projetos aqui
-    {
-      id: 'projeto2',
-      name: 'Projeto 2',
-      path: '/caminho/para/projeto2',
-      branch: 'master',
-      commands: [
-        'git pull origin master',
-        'npm install',
-        'pm2 restart projeto2'
-      ]
-    } */
+    }
   ]
 };
