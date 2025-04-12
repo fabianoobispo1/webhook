@@ -20,8 +20,8 @@ module.exports = {
       ]
     },
     {
-      id: 'beautitech-api',
-      name: 'beautitech-api',
+      id: 'beautitechapi',
+      name: 'beautitechapi',
       path: '/root/projetos/bruvii/backend',
       branch: 'main',
       source: 'gitlab',
