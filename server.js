@@ -26,7 +26,7 @@ try {
       `module.exports = ${JSON.stringify(config, null, 2)};`
     );
     
-    console.log('Arquivo de configuração criado com valores padrão.');
+    console.log('Arquivo de configuração criado com valores padrão');
   }
 } catch (error) {
   console.error('Erro ao carregar configuração:', error);
