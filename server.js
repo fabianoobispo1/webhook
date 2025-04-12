@@ -199,7 +199,6 @@ app.post('/webhook/:projectId', express.json(), verifyGitLabSignature, async (re
 });
 
 // Rota para webhooks do GitHub
-// Rota para webhooks do GitHub
 app.post('/github/:projectId', rawBodyParser, verifyGitHubSignature, async (req, res) => {
   try {
     const projectId = req.params.projectId;
