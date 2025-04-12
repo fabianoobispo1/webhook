@@ -97,11 +97,11 @@ function executeCommands(commands, cwd) {
 app.post('/webhook/:projectId', async (req, res) => {
   try {
     // Verificar a assinatura
-    if (!verifySignature(req)) {
+/*     if (!verifySignature(req)) {
       console.error('Assinatura inválida');
       return res.status(401).json({ error: 'Assinatura inválida' });
     }
-    
+     */
     const projectId = req.params.projectId;
     const project = config.projects.find(p => p.id === projectId);
     
