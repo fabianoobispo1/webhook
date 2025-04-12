@@ -3,7 +3,7 @@ module.exports = {
   port: process.env.PORT || 3100,
   
   // Chave secreta para verificar assinaturas do GitLab
-  secretKey: process.env.SECRET_KEY || 'sua_chave_secreta_aqui',
+  secretKey: process.env.SECRET_KEY || 'chave_seecreta',
   
   // Configuração dos projetos
   projects: [
@@ -12,6 +12,7 @@ module.exports = {
       name: 'Webhook',
       path: '/root/projetos/webhook',
       branch: 'main',
+      source: 'github',
       commands: [
         'git pull origin main',
         'npm install',

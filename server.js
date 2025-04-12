@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 // Verificar se o arquivo de configuração existe
 const configPath = path.join(__dirname, 'config.js');
@@ -97,11 +98,11 @@ function executeCommands(commands, cwd) {
 app.post('/webhook/:projectId', async (req, res) => {
   try {
     // Verificar a assinatura
-/*     if (!verifySignature(req)) {
+    if (!verifySignature(req)) {
       console.error('Assinatura inválida');
       return res.status(401).json({ error: 'Assinatura inválida' });
     }
-     */
+    
     const projectId = req.params.projectId;
     const project = config.projects.find(p => p.id === projectId);
     
@@ -137,6 +138,87 @@ app.post('/webhook/:projectId', async (req, res) => {
     }
   }
 });
+
+
+
+
+
+// Função para verificar a assinatura do GitHub
+function verifyGitHubSignature(req) {
+  try {
+    const signature = req.headers['x-hub-signature-256'];
+    if (!signature) {
+      return false;
+    }
+    
+    const secret = config.secretKey;
+    const payload = JSON.stringify(req.body);
+    const hmac = crypto.createHmac('sha256', secret);
+    const digest = 'sha256=' + hmac.update(payload).digest('hex');
+    
+    return crypto.timingSafeEqual(
+      Buffer.from(signature),
+      Buffer.from(digest)
+    );
+  } catch (error) {
+    console.error('Erro ao verificar assinatura do GitHub:', error);
+    return false;
+  }
+}
+
+// Rota para webhooks do GitHub
+app.post('/github/:projectId', async (req, res) => {
+  try {
+    // Verificar a assinatura
+    if (!verifyGitHubSignature(req)) {
+      console.error('Assinatura do GitHub inválida');
+      return res.status(401).json({ error: 'Assinatura inválida' });
+    }
+    
+    const projectId = req.params.projectId;
+    const project = config.projects.find(p => p.id === projectId);
+    
+    if (!project) {
+      console.error(`Projeto não encontrado: ${projectId}`);
+      return res.status(404).json({ error: 'Projeto não encontrado' });
+    }
+    
+    // Verificar se o evento é um push
+    const event = req.headers['x-github-event'];
+    if (event !== 'push') {
+      console.log(`Ignorando evento ${event}, esperando push`);
+      return res.json({ message: `Evento ${event} ignorado` });
+    }
+    
+    // Verificar se o push é para a branch correta
+    const payload = req.body;
+    const ref = payload.ref;
+    const branch = ref ? ref.replace('refs/heads/', '') : '';
+    
+    if (branch !== project.branch) {
+      console.log(`Ignorando push para branch ${branch}, esperando ${project.branch}`);
+      return res.json({ message: `Ignorando push para branch ${branch}` });
+    }
+    
+    // Responder imediatamente para não bloquear o GitHub
+    res.status(202).json({ message: `Iniciando deploy para ${project.name}` });
+    
+    // Executar os comandos de deploy
+    try {
+      console.log(`Iniciando deploy para ${project.name} (acionado pelo GitHub)`);
+      await executeCommands(project.commands, project.path);
+      console.log(`Deploy concluído para ${project.name}`);
+    } catch (error) {
+      console.error(`Erro no deploy para ${project.name}: ${error}`);
+    }
+  } catch (error) {
+    console.error('Erro ao processar webhook do GitHub:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+  }
+});
+
 
 // Rota de status
 app.get('/status', (req, res) => {
