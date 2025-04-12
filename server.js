@@ -1,11 +1,10 @@
 const express = require('express');
-const bodyParser = require('body-parser');
+const crypto = require('crypto');
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 
-// Verificar se o arquivo de configuração existe
+// Carregar configuração
 const configPath = path.join(__dirname, 'config.js');
 let config;
 
@@ -15,7 +14,7 @@ try {
   } else {
     // Configuração padrão se o arquivo não existir
     config = {
-      port: process.env.PORT || 3100,
+      port: process.env.PORT || 9000,
       secretKey: process.env.SECRET_KEY || 'chave_padrao',
       projects: []
     };
@@ -26,7 +25,7 @@ try {
       `module.exports = ${JSON.stringify(config, null, 2)};`
     );
     
-    console.log('Arquivo de configuração criado com valores padrão');
+    console.log('Arquivo de configuração criado com valores padrão.');
   }
 } catch (error) {
   console.error('Erro ao carregar configuração:', error);
@@ -34,57 +33,6 @@ try {
 }
 
 const app = express();
-
-
-// Middleware para analisar JSON com tratamento de erro
-app.use(bodyParser.json({
-  verify: (req, res, buf, encoding) => {
-    try {
-      JSON.parse(buf);
-    } catch (e) {
-      res.status(400).json({ error: 'Payload inválido' });
-      throw new Error('Payload inválido');
-    }
-  }
-}));
-
-// Middleware para tratamento global de erros
-app.use((err, req, res, next) => {
-  console.error('Erro na aplicação:', err);
-  res.status(500).json({ error: 'Erro interno do servidor' });
-});
-
-// Adicione este middleware no início para logar todas as requisições
-app.use((req, res, next) => {
-  console.log('=== Nova Requisição ===');
-  console.log(`Método: ${req.method}`);
-  console.log(`URL: ${req.url}`);
-  console.log('Headers:', JSON.stringify(req.headers, null, 2));
-  
-  // Capturar e logar o corpo da requisição
-  let data = '';
-  req.on('data', chunk => {
-    data += chunk;
-  });
-  
-  req.on('end', () => {
-    console.log('Corpo da requisição:', data);
-    // Armazenar o corpo bruto para uso posterior
-    req.rawBody = data;
-    next();
-  });
-});
-
-// Função para verificar a assinatura do GitLab
-function verifySignature(req) {
-  try {
-    const token = req.headers['x-gitlab-token'];
-    return token === config.secretKey;
-  } catch (error) {
-    console.error('Erro ao verificar assinatura:', error);
-    return false;
-  }
-}
 
 // Função para executar comandos em sequência
 function executeCommands(commands, cwd) {
@@ -116,15 +64,64 @@ function executeCommands(commands, cwd) {
   });
 }
 
-// Rota principal para receber webhooks
-app.post('/webhook/:projectId', async (req, res) => {
-  try {
-    // Verificar a assinatura
-    if (!verifySignature(req)) {
-      console.error('Assinatura inválida');
-      return res.status(401).json({ error: 'Assinatura inválida' });
+// Middleware para verificar a assinatura do GitLab
+function verifyGitLabSignature(req, res, next) {
+  const token = req.headers['x-gitlab-token'];
+  
+  if (token !== config.secretKey) {
+    console.error('Assinatura do GitLab inválida');
+    return res.status(401).json({ error: 'Assinatura inválida' });
+  }
+  
+  next();
+}
+
+// Middleware para capturar o corpo bruto para GitHub
+function rawBodyParser(req, res, next) {
+  req.rawBody = '';
+  req.setEncoding('utf8');
+
+  req.on('data', (chunk) => {
+    req.rawBody += chunk;
+  });
+
+  req.on('end', () => {
+    try {
+      req.body = JSON.parse(req.rawBody);
+      next();
+    } catch (err) {
+      console.error('Erro ao analisar JSON:', err);
+      res.status(400).send('Payload inválido');
     }
-    
+  });
+}
+
+// Middleware para verificar a assinatura do GitHub
+function verifyGitHubSignature(req, res, next) {
+  const signature = req.headers['x-hub-signature-256'];
+  
+  if (!signature) {
+    console.error('Cabeçalho x-hub-signature-256 ausente');
+    return res.status(401).json({ error: 'Assinatura inválida' });
+  }
+  
+  const hmac = crypto.createHmac('sha256', config.secretKey);
+  const digest = 'sha256=' + hmac.update(req.rawBody).digest('hex');
+  
+  console.log(`Assinatura recebida: ${signature}`);
+  console.log(`Assinatura calculada: ${digest}`);
+  
+  if (signature !== digest) {
+    console.error('Assinatura do GitHub inválida');
+    return res.status(401).json({ error: 'Assinatura inválida' });
+  }
+  
+  next();
+}
+
+// Rota para webhooks do GitLab
+app.post('/webhook/:projectId', express.json(), verifyGitLabSignature, async (req, res) => {
+  try {
     const projectId = req.params.projectId;
     const project = config.projects.find(p => p.id === projectId);
     
@@ -154,49 +151,16 @@ app.post('/webhook/:projectId', async (req, res) => {
       console.error(`Erro no deploy para ${project.name}: ${error}`);
     }
   } catch (error) {
-    console.error('Erro ao processar webhook:', error);
+    console.error('Erro ao processar webhook do GitLab:', error);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
 });
 
-
-
-
-
-// Função para verificar a assinatura do GitHub
-function verifyGitHubSignature(req) {
-  try {
-    const signature = req.headers['x-hub-signature-256'];
-    if (!signature) {
-      return false;
-    }
-    
-    const secret = config.secretKey;
-    const payload = JSON.stringify(req.body);
-    const hmac = crypto.createHmac('sha256', secret);
-    const digest = 'sha256=' + hmac.update(payload).digest('hex');
-    
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(digest)
-    );
-  } catch (error) {
-    console.error('Erro ao verificar assinatura do GitHub:', error);
-    return false;
-  }
-}
-
 // Rota para webhooks do GitHub
-app.post('/github/:projectId', async (req, res) => {
+app.post('/github/:projectId', rawBodyParser, verifyGitHubSignature, async (req, res) => {
   try {
-    // Verificar a assinatura
-    if (!verifyGitHubSignature(req)) {
-      console.error('Assinatura do GitHub inválida');
-      return res.status(401).json({ error: 'Assinatura inválida' });
-    }
-    
     const projectId = req.params.projectId;
     const project = config.projects.find(p => p.id === projectId);
     
@@ -213,8 +177,7 @@ app.post('/github/:projectId', async (req, res) => {
     }
     
     // Verificar se o push é para a branch correta
-    const payload = req.body;
-    const ref = payload.ref;
+    const ref = req.body.ref;
     const branch = ref ? ref.replace('refs/heads/', '') : '';
     
     if (branch !== project.branch) {
@@ -241,9 +204,8 @@ app.post('/github/:projectId', async (req, res) => {
   }
 });
 
-
 // Rota de status
-app.get('/status', (req, res) => {
+app.get('/status', express.json(), (req, res) => {
   try {
     res.json({
       status: 'online',
@@ -255,9 +217,21 @@ app.get('/status', (req, res) => {
   }
 });
 
+// Rota de ping para GitHub (usada na configuração inicial do webhook)
+app.post('/github/:projectId/ping', rawBodyParser, verifyGitHubSignature, (req, res) => {
+  console.log('Recebido ping do GitHub');
+  res.status(200).json({ message: 'pong' });
+});
+
 // Tratamento para rotas não encontradas
 app.use((req, res) => {
   res.status(404).json({ error: 'Rota não encontrada' });
+});
+
+// Tratamento global de erros
+app.use((err, req, res, next) => {
+  console.error('Erro na aplicação:', err);
+  res.status(500).json({ error: 'Erro interno do servidor' });
 });
 
 // Iniciar o servidor com tratamento de erro
