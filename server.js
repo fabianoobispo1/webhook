@@ -14,7 +14,7 @@ try {
   } else {
     // Configuração padrão se o arquivo não existir
     config = {
-      port: process.env.PORT || 9010,
+      port: process.env.PORT || 3100,
       secretKey: process.env.SECRET_KEY || 'chave_padrao',
       projects: []
     };
