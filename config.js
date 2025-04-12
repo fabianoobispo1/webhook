@@ -39,7 +39,7 @@ module.exports = {
       source: 'gitlab',
       commands: [
         'git pull origin main',
-        'cp -R /root/projetos/webhook/frontend/* /var/www/beautitech.bruvii.com/', 
+        'cp -R /root/projetos/bruvii/frontend/* /var/www/beautitech.bruvii.com/',
         
       ]
     }
