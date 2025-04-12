@@ -269,7 +269,7 @@ app.post('/github/:projectId/ping', rawBodyParser, verifyGitHubSignature, (req, 
 
 // Tratamento para rotas não encontradas
 app.use((req, res) => {
-  res.status(404).json({ error: 'Rota não encontrada' });
+  res.status(404).json({ error: 'Rota não encontrada.' });
 });
 
 // Tratamento global de erros
