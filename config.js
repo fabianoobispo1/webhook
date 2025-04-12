@@ -1,6 +1,6 @@
 module.exports = {
   // Porta em que o servidor vai rodar
-  port: process.env.PORT || 9000,
+  port: process.env.PORT || 3100,
   
   // Chave secreta para verificar assinaturas do GitLab
   secretKey: process.env.SECRET_KEY || 'sua_chave_secreta_aqui',
