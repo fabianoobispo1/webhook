@@ -18,6 +18,18 @@ module.exports = {
         'npm install',
         'pm2 restart webhook-server'
       ]
+    },
+    {
+      id: 'beautitech-api',
+      name: 'beautitech-api',
+      path: '/root/projetos/bruvii/backend',
+      branch: 'main',
+      source: 'gitlab',
+      commands: [
+        'git pull origin main',
+        'npm install',
+        'pm2 restart beautitech-api'
+      ]
     }
   ]
 };
