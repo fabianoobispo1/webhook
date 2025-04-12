@@ -3,7 +3,7 @@ module.exports = {
   port: process.env.PORT || 3100,
   
   // Chave secreta para verificar assinaturas do GitLab
-  secretKey: process.env.SECRET_KEY || 'chave_seecreta',
+  secretKey: process.env.SECRET_KEY || 'minhaChaveSecreta',
   
   // Configuração dos projetos
   projects: [

@@ -35,6 +35,7 @@ try {
 
 const app = express();
 
+
 // Middleware para analisar JSON com tratamento de erro
 app.use(bodyParser.json({
   verify: (req, res, buf, encoding) => {
@@ -51,6 +52,27 @@ app.use(bodyParser.json({
 app.use((err, req, res, next) => {
   console.error('Erro na aplicação:', err);
   res.status(500).json({ error: 'Erro interno do servidor' });
+});
+
+// Adicione este middleware no início para logar todas as requisições
+app.use((req, res, next) => {
+  console.log('=== Nova Requisição ===');
+  console.log(`Método: ${req.method}`);
+  console.log(`URL: ${req.url}`);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  
+  // Capturar e logar o corpo da requisição
+  let data = '';
+  req.on('data', chunk => {
+    data += chunk;
+  });
+  
+  req.on('end', () => {
+    console.log('Corpo da requisição:', data);
+    // Armazenar o corpo bruto para uso posterior
+    req.rawBody = data;
+    next();
+  });
 });
 
 // Função para verificar a assinatura do GitLab
