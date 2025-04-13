@@ -20,28 +20,41 @@ module.exports = {
       ]
     },
     {
-      id: 'beautitechapi',
-      name: 'beautitechapi',
-      path: '/root/projetos/bruvii/backend',
+      id: 'beautitechapihml',
+      name: 'beautitechapihml',
+      path: '/root/projetos/bruvii/hml/backend',
       branch: 'main',
       source: 'gitlab',
       commands: [
         'git pull origin main',
         'npm install',
-        'pm2 restart beautitech-api'
+        'pm2 restart beautitech-api-hml'
       ]
     },
     {
-      id: 'beautitechweb',
-      name: 'beautitechweb',
-      path: '/root/projetos/bruvii/frontend',
+      id: 'beautitechwebhml',
+      name: 'beautitechwebhml',
+      path: '/root/projetos/bruvii/hml/frontend',
       branch: 'main',
       source: 'gitlab',
       commands: [
         'git pull origin main',
-        'cp -R /root/projetos/bruvii/frontend/* /var/www/beautitech.bruvii.com/',
+        'cp -R /root/projetos/bruvii/hml/frontend/* /var/www/beautitech.hml.bruvii.com/',
         
       ]
     }
   ]
 };
+
+/* 
+rm -rf vendor
+
+
+Send command to Terminal
+Clear Composer's cache:
+composer clear-cache
+
+
+Send command to Terminal
+Reinstall dependencies:
+composer install */
