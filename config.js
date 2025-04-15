@@ -48,6 +48,7 @@ module.exports = {
 
 /* 
 rm -rf vendor
+rsync -av --exclude='.env' /root/projetos/bruvii/hml/frontend/ /var/www/beautitech.hml.bruvii.com/
 
 
 Send command to Terminal
